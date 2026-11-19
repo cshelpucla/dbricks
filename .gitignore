@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Local state
+app/.chat.sqlite
+*.sqlite
+.env
+.databrickscfg
+
+# Personal login notes (workspace URL, OAuth links)
+dblogin.sh
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store

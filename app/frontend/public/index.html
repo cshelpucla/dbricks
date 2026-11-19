@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bluesky Analytics</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Ccircle cx=%278%27 cy=%278%27 r=%277%27 fill=%27%232a78d6%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>Bluesky analytics</h1>
+    <span id="badge" class="badge" hidden></span>
+  </div>
+  <nav class="tabs" role="tablist" aria-label="Sections">
+    <button role="tab" id="t-map" aria-controls="tab-map" data-tab="map">Topic map</button>
+    <button role="tab" id="t-world" aria-controls="tab-world" data-tab="world">World map</button>
+    <button role="tab" id="t-pipelines" aria-controls="tab-pipelines" data-tab="pipelines">Pipelines</button>
+    <button role="tab" id="t-costs" aria-controls="tab-costs" data-tab="costs">Costs</button>
+    <button role="tab" id="t-diagram" aria-controls="tab-diagram" data-tab="diagram">Architecture</button>
+    <button role="tab" id="t-model" aria-controls="tab-model" data-tab="model">Data model</button>
+    <button role="tab" id="t-chat" aria-controls="tab-chat" data-tab="chat">Ask</button>
+    <button role="tab" id="t-control" aria-controls="tab-control" data-tab="control">Control</button>
+  </nav>
+  <button id="theme" class="btn ghost" type="button" aria-label="Switch colour theme">Theme: auto</button>
+</header>
+
+<div id="error" class="error" role="alert" hidden></div>
+
+<section id="tab-map" class="panel" role="tabpanel" aria-labelledby="t-map" hidden>
+  <div id="summary" class="summary" aria-live="polite"></div>
+  <section class="filters" id="filters" aria-label="Filters"></section>
+  <main class="stage">
+    <section class="viz" aria-label="Topic cluster map">
+      <div class="toolbar">
+        <div class="seg" role="group" aria-label="Colour by">
+          <button type="button" data-color="topic" aria-pressed="true">Topic</button>
+          <button type="button" data-color="people" aria-pressed="false">People</button>
+          <button type="button" data-color="companies" aria-pressed="false">Companies</button>
+          <button type="button" data-color="trend" aria-pressed="false">Trend</button>
+        </div>
+        <div class="seg" role="group" aria-label="View">
+          <button type="button" data-view="map" aria-pressed="true">Map</button>
+          <button type="button" data-view="table" aria-pressed="false">Table</button>
+        </div>
+        <span class="hint">Bubble size = number of posts. Distance = similarity of meaning; the axes have no units.</span>
+      </div>
+      <div id="mapKey" class="mapkey" aria-live="polite"></div>
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="topicMap" tabindex="0" role="img"
+                aria-label="Map of topic clusters. Use the Table view for the same data as a list."></canvas>
+        <div class="zoom">
+          <button class="btn" id="zoomIn" type="button" aria-label="Zoom in">+</button>
+          <button class="btn" id="zoomOut" type="button" aria-label="Zoom out">&minus;</button>
+          <button class="btn" id="fit" type="button" aria-label="Fit all clusters">Fit</button>
+        </div>
+        <div id="tip" class="tip" role="tooltip" hidden></div>
+        <div id="empty" class="empty" hidden>No posts match these filters.</div>
+      </div>
+      <div class="table-wrap" id="tableWrap" hidden></div>
+    </section>
+    <aside class="side" aria-label="Legend and details">
+      <section id="legend" class="card"></section>
+      <section id="legendPeople" class="card"></section>
+      <section id="legendCompanies" class="card"></section>
+      <section id="detail" class="card"></section>
+    </aside>
+  </main>
+</section>
+
+<section id="tab-world" class="panel" role="tabpanel" aria-labelledby="t-world" hidden></section>
+<section id="tab-pipelines" class="panel" role="tabpanel" aria-labelledby="t-pipelines" hidden></section>
+<section id="tab-costs" class="panel" role="tabpanel" aria-labelledby="t-costs" hidden></section>
+<section id="tab-diagram" class="panel" role="tabpanel" aria-labelledby="t-diagram" hidden></section>
+<section id="tab-model" class="panel" role="tabpanel" aria-labelledby="t-model" hidden></section>
+<section id="tab-chat" class="panel" role="tabpanel" aria-labelledby="t-chat" hidden></section>
+<section id="tab-control" class="panel" role="tabpanel" aria-labelledby="t-control" hidden></section>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

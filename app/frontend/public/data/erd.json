@@ -1,0 +1,733 @@
+{
+ "tables": [
+  {
+   "name": "events_raw",
+   "layer": "bronze",
+   "col": 0,
+   "note": "Raw Jetstream events; clustered by event_date, collection",
+   "columns": [
+    [
+     "seq",
+     "bigint"
+    ],
+    [
+     "time_us",
+     "bigint"
+    ],
+    [
+     "event_time",
+     "timestamp"
+    ],
+    [
+     "event_date",
+     "date"
+    ],
+    [
+     "kind",
+     "string"
+    ],
+    [
+     "did",
+     "string"
+    ],
+    [
+     "collection",
+     "string"
+    ],
+    [
+     "operation",
+     "string"
+    ],
+    [
+     "rkey",
+     "string"
+    ],
+    [
+     "rev",
+     "string"
+    ],
+    [
+     "event",
+     "variant"
+    ],
+    [
+     "ingested_at",
+     "timestamp"
+    ]
+   ]
+  },
+  {
+   "name": "posts",
+   "layer": "silver",
+   "col": 1,
+   "note": "Current posts (deletes applied)",
+   "columns": [
+    [
+     "uri",
+     "string",
+     "pk"
+    ],
+    [
+     "did",
+     "string"
+    ],
+    [
+     "rkey",
+     "string"
+    ],
+    [
+     "cid",
+     "string"
+    ],
+    [
+     "text",
+     "string"
+    ],
+    [
+     "langs",
+     "array<string>"
+    ],
+    [
+     "reply_parent_uri",
+     "string",
+     "fk"
+    ],
+    [
+     "reply_root_uri",
+     "string",
+     "fk"
+    ],
+    [
+     "embed_type",
+     "string"
+    ],
+    [
+     "created_at",
+     "timestamp"
+    ],
+    [
+     "record",
+     "variant"
+    ],
+    [
+     "rev",
+     "string"
+    ],
+    [
+     "event_time",
+     "timestamp"
+    ]
+   ]
+  },
+  {
+   "name": "likes",
+   "layer": "silver",
+   "col": 1,
+   "note": "Current likes",
+   "columns": [
+    [
+     "uri",
+     "string",
+     "pk"
+    ],
+    [
+     "did",
+     "string"
+    ],
+    [
+     "rkey",
+     "string"
+    ],
+    [
+     "subject_uri",
+     "string",
+     "fk"
+    ],
+    [
+     "subject_cid",
+     "string"
+    ],
+    [
+     "created_at",
+     "timestamp"
+    ],
+    [
+     "rev",
+     "string"
+    ],
+    [
+     "event_time",
+     "timestamp"
+    ]
+   ]
+  },
+  {
+   "name": "reposts",
+   "layer": "silver",
+   "col": 1,
+   "note": "Current reposts",
+   "columns": [
+    [
+     "uri",
+     "string",
+     "pk"
+    ],
+    [
+     "did",
+     "string"
+    ],
+    [
+     "rkey",
+     "string"
+    ],
+    [
+     "subject_uri",
+     "string",
+     "fk"
+    ],
+    [
+     "subject_cid",
+     "string"
+    ],
+    [
+     "created_at",
+     "timestamp"
+    ],
+    [
+     "rev",
+     "string"
+    ],
+    [
+     "event_time",
+     "timestamp"
+    ]
+   ]
+  },
+  {
+   "name": "follows",
+   "layer": "silver",
+   "col": 1,
+   "note": "Current follows (did follows subject_did)",
+   "columns": [
+    [
+     "uri",
+     "string",
+     "pk"
+    ],
+    [
+     "did",
+     "string"
+    ],
+    [
+     "rkey",
+     "string"
+    ],
+    [
+     "subject_did",
+     "string"
+    ],
+    [
+     "created_at",
+     "timestamp"
+    ],
+    [
+     "rev",
+     "string"
+    ],
+    [
+     "event_time",
+     "timestamp"
+    ]
+   ]
+  },
+  {
+   "name": "post_enriched",
+   "layer": "gold",
+   "col": 2,
+   "note": "One row per post: bot score, geo, topic, embedding",
+   "columns": [
+    [
+     "uri",
+     "string",
+     "pk"
+    ],
+    [
+     "did",
+     "string"
+    ],
+    [
+     "event_time",
+     "timestamp"
+    ],
+    [
+     "time_us",
+     "bigint"
+    ],
+    [
+     "text",
+     "string"
+    ],
+    [
+     "lang",
+     "string"
+    ],
+    [
+     "hashtags",
+     "array<string>"
+    ],
+    [
+     "bot_score",
+     "int"
+    ],
+    [
+     "is_filtered",
+     "boolean"
+    ],
+    [
+     "geo_country",
+     "string"
+    ],
+    [
+     "geo_place",
+     "string"
+    ],
+    [
+     "geo_lat",
+     "double"
+    ],
+    [
+     "geo_lon",
+     "double"
+    ],
+    [
+     "geo_confidence",
+     "double"
+    ],
+    [
+     "topic_qcode",
+     "string",
+     "fk"
+    ],
+    [
+     "topic_label",
+     "string"
+    ],
+    [
+     "topic_l1",
+     "string"
+    ],
+    [
+     "topic_score",
+     "double"
+    ],
+    [
+     "embedding",
+     "array<float>"
+    ]
+   ]
+  },
+  {
+   "name": "post_map",
+   "layer": "gold",
+   "col": 2,
+   "note": "2D position and cluster per sampled post (overwritten every 2 hours)",
+   "columns": [
+    [
+     "uri",
+     "string",
+     "pk"
+    ],
+    [
+     "x",
+     "double"
+    ],
+    [
+     "y",
+     "double"
+    ],
+    [
+     "cluster_id",
+     "int",
+     "fk"
+    ],
+    [
+     "computed_at",
+     "timestamp"
+    ]
+   ]
+  },
+  {
+   "name": "topic_clusters",
+   "layer": "gold",
+   "col": 2,
+   "note": "One row per topic cluster: LLM name, top-level IPTC subject, size, centre",
+   "columns": [
+    [
+     "cluster_id",
+     "int",
+     "pk"
+    ],
+    [
+     "label",
+     "string"
+    ],
+    [
+     "topic_l1",
+     "string"
+    ],
+    [
+     "label_source",
+     "string"
+    ],
+    [
+     "n",
+     "int"
+    ],
+    [
+     "x",
+     "double"
+    ],
+    [
+     "y",
+     "double"
+    ],
+    [
+     "iptc_label",
+     "string"
+    ],
+    [
+     "iptc_l1",
+     "string"
+    ],
+    [
+     "top_hashtags",
+     "array<string>"
+    ],
+    [
+     "computed_at",
+     "timestamp"
+    ]
+   ]
+  },
+  {
+   "name": "bot_accounts",
+   "layer": "gold",
+   "col": 3,
+   "note": "Accounts flagged as bots or spam",
+   "columns": [
+    [
+     "did",
+     "string",
+     "pk"
+    ],
+    [
+     "score",
+     "int"
+    ],
+    [
+     "reasons",
+     "array<string>"
+    ],
+    [
+     "first_seen",
+     "timestamp"
+    ]
+   ]
+  },
+  {
+   "name": "post_topics",
+   "layer": "gold",
+   "col": 3,
+   "note": "Post x topic (IPTC match or hashtag)",
+   "columns": [
+    [
+     "uri",
+     "string",
+     "fk"
+    ],
+    [
+     "topic_type",
+     "string"
+    ],
+    [
+     "topic_id",
+     "string",
+     "fk"
+    ],
+    [
+     "topic_label",
+     "string"
+    ],
+    [
+     "rank",
+     "int"
+    ],
+    [
+     "score",
+     "double"
+    ],
+    [
+     "event_time",
+     "timestamp"
+    ]
+   ]
+  },
+  {
+   "name": "post_geo",
+   "layer": "gold",
+   "col": 3,
+   "note": "Post x location candidate",
+   "columns": [
+    [
+     "uri",
+     "string",
+     "fk"
+    ],
+    [
+     "place",
+     "string"
+    ],
+    [
+     "country_code",
+     "string"
+    ],
+    [
+     "lat",
+     "double"
+    ],
+    [
+     "lon",
+     "double"
+    ],
+    [
+     "kind",
+     "string"
+    ],
+    [
+     "confidence",
+     "double"
+    ],
+    [
+     "matched_text",
+     "string"
+    ]
+   ]
+  },
+  {
+   "name": "topic_taxonomy",
+   "layer": "gold",
+   "col": 3,
+   "note": "IPTC Media Topics hierarchy",
+   "columns": [
+    [
+     "qcode",
+     "string",
+     "pk"
+    ],
+    [
+     "label",
+     "string"
+    ],
+    [
+     "definition",
+     "string"
+    ],
+    [
+     "parent_qcode",
+     "string",
+     "fk"
+    ],
+    [
+     "level",
+     "int"
+    ],
+    [
+     "path",
+     "array<string>"
+    ],
+    [
+     "embedding",
+     "array<float>"
+    ]
+   ]
+  }
+ ],
+ "relations": [
+  {
+   "from": [
+    "events_raw",
+    "event"
+   ],
+   "to": [
+    "posts",
+    "uri"
+   ],
+   "label": "post commits"
+  },
+  {
+   "from": [
+    "events_raw",
+    "event"
+   ],
+   "to": [
+    "likes",
+    "uri"
+   ],
+   "label": "like commits"
+  },
+  {
+   "from": [
+    "events_raw",
+    "event"
+   ],
+   "to": [
+    "reposts",
+    "uri"
+   ],
+   "label": "repost commits"
+  },
+  {
+   "from": [
+    "events_raw",
+    "event"
+   ],
+   "to": [
+    "follows",
+    "uri"
+   ],
+   "label": "follow commits"
+  },
+  {
+   "from": [
+    "posts",
+    "uri"
+   ],
+   "to": [
+    "likes",
+    "subject_uri"
+   ],
+   "label": "1 : N"
+  },
+  {
+   "from": [
+    "posts",
+    "uri"
+   ],
+   "to": [
+    "reposts",
+    "subject_uri"
+   ],
+   "label": "1 : N"
+  },
+  {
+   "from": [
+    "posts",
+    "uri"
+   ],
+   "to": [
+    "posts",
+    "reply_parent_uri"
+   ],
+   "label": "replies"
+  },
+  {
+   "from": [
+    "posts",
+    "uri"
+   ],
+   "to": [
+    "post_enriched",
+    "uri"
+   ],
+   "label": "1 : 1"
+  },
+  {
+   "from": [
+    "post_enriched",
+    "uri"
+   ],
+   "to": [
+    "post_map",
+    "uri"
+   ],
+   "label": "1 : 1"
+  },
+  {
+   "from": [
+    "bot_accounts",
+    "did"
+   ],
+   "to": [
+    "post_enriched",
+    "did"
+   ],
+   "label": "flags"
+  },
+  {
+   "from": [
+    "post_enriched",
+    "uri"
+   ],
+   "to": [
+    "post_topics",
+    "uri"
+   ],
+   "label": "1 : N"
+  },
+  {
+   "from": [
+    "post_enriched",
+    "uri"
+   ],
+   "to": [
+    "post_geo",
+    "uri"
+   ],
+   "label": "1 : N"
+  },
+  {
+   "from": [
+    "topic_taxonomy",
+    "qcode"
+   ],
+   "to": [
+    "post_topics",
+    "topic_id"
+   ],
+   "label": "1 : N"
+  },
+  {
+   "from": [
+    "topic_taxonomy",
+    "qcode"
+   ],
+   "to": [
+    "post_enriched",
+    "topic_qcode"
+   ],
+   "label": "1 : N"
+  },
+  {
+   "from": [
+    "topic_taxonomy",
+    "qcode"
+   ],
+   "to": [
+    "topic_taxonomy",
+    "parent_qcode"
+   ],
+   "label": "parent"
+  },
+  {
+   "from": [
+    "topic_clusters",
+    "cluster_id"
+   ],
+   "to": [
+    "post_map",
+    "cluster_id"
+   ],
+   "label": "1 : N"
+  }
+ ]
+}

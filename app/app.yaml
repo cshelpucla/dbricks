@@ -1,0 +1,14 @@
+# Databricks App definition. The platform runs `command` and provides DATABRICKS_* env vars
+# and the app's service principal credentials.
+command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
+env:
+  - name: CATALOG
+    value: datawranglers
+  - name: SCHEMA
+    value: bluesky
+  # Chat tab model (Databricks Model Serving endpoint with tool calling).
+  - name: CHAT_ENDPOINT
+    value: databricks-claude-sonnet-5-5
+  # Bound to the SQL warehouse resource named "sql-warehouse" in the app's resource settings.
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: sql-warehouse
