@@ -3,11 +3,14 @@
 import { getJSON } from "../api.js";
 import { clear, el, fmt } from "../lib/dom.js";
 import { singleSelect } from "../lib/controls.js";
+import { entityBadge, industryIcon } from "../lib/badges.js";
 
 const RANGES = [[1, "Last hour"], [6, "Last 6 hours"], [24, "Last 24 hours"], [168, "Last 7 days"]];
 const KEYS = ["iptc", "people", "companies", "clusters"];
 const CHILD_CAP = 100;          // children listed under one parent before "Show all"
 const MATCH_CAP = 400;          // search results shown
+const NOUN = { iptc: ["concept", "concepts"], people: ["person", "people"], companies: ["company", "companies"], clusters: ["cluster", "clusters"] };
+const count = (n, k) => `${fmt.int(n)} ${NOUN[k][n === 1 ? 0 : 1]}`;
 
 export function init({ root, onError, setBadge }) {
   let mode = null, hours = 24, key = "iptc", overview = null, tree = null, loaded = false;
@@ -15,6 +18,7 @@ export function init({ root, onError, setBadge }) {
   const expanded = new Set(), showAll = new Set(), trees = new Map();
 
   const controls = el("div", { class: "row-controls" });
+  const fresh = el("span", { class: "muted small tax-fresh" });
   const cards = el("div", { class: "tax-cards", role: "group", "aria-label": "Taxonomy" });
   const note = el("div", { class: "note", hidden: true }, "Sample taxonomies with invented counts. They show the layout only.");
   const search = el("input", { type: "search", placeholder: "Search names, aliases, codes", "aria-label": "Search this taxonomy" });
@@ -33,7 +37,7 @@ export function init({ root, onError, setBadge }) {
     el("aside", { class: "side", "aria-label": "Entry details and matching rules" }, detail, about)));
 
   controls.append(singleSelect({ label: "Period", options: RANGES.map(([value, label]) => ({ value, label })), value: hours,
-    onChange: (v) => { hours = v; trees.clear(); load(); } }).el);
+    onChange: (v) => { hours = v; trees.clear(); load(); } }).el, fresh);
   let timer = null;
   search.addEventListener("input", () => { clearTimeout(timer); timer = setTimeout(() => { q = search.value.trim().toLowerCase(); paintTree(); }, 150); });
   seen.addEventListener("change", () => { seenOnly = seen.checked; paintTree(); });
@@ -44,6 +48,7 @@ export function init({ root, onError, setBadge }) {
       const [o] = await Promise.all([getJSON("/api/taxonomies", params), loadTree()]);
       overview = o; mode = o.mode; loaded = true; onError(null); setBadge(mode);
       note.hidden = mode !== "demo";
+      fresh.textContent = o.window.newest ? `Newest tagged post: ${fmt.ago(o.window.newest)}. Counts cover posts the enrichment job has processed.` : "";
       paintCards();
     } catch (err) { onError(`Could not load taxonomies: ${err.message}`); }
   }
@@ -88,8 +93,8 @@ export function init({ root, onError, setBadge }) {
       lines: [`${share(w.with_topic, w.embedded)} of embedded posts got a topic`, `${fmt.int(w.concepts_seen)} concepts used · ${ago}`] };
     if (k === "people") return { big: fmt.int(s.size), unit: `people in ${s.groups} groups`,
       lines: [`${fmt.int(w.with_person)} posts mention one (${share(w.with_person, w.clean)})`, `${fmt.int(w.people_seen)} people seen · ${ago}`] };
-    if (k === "companies") return { big: fmt.int(s.size), unit: `companies in ${s.sectors} sectors, ${fmt.int(s.industries)} industries`,
-      lines: [`${fmt.int(w.with_company)} posts mention one (${share(w.with_company, w.clean)})`, `${fmt.int(w.companies_seen)} companies seen · ${ago}`] };
+    if (k === "companies") return { big: fmt.int(s.size), unit: `companies in ${s.sectors} sectors`,
+      lines: [`${fmt.int(w.with_company)} posts mention one (${share(w.with_company, w.clean)})`, `${fmt.int(w.companies_seen)} seen · ${fmt.int(s.industries)} industries · ${ago}`] };
     return { big: fmt.int(s.size), unit: "clusters in the latest map",
       lines: [`${share(s.posts_with_subject, s.posts)} of mapped posts sit in a cluster with a subject`, s.loaded_at ? `computed ${fmt.ago(s.loaded_at)}` : ""] };
   }
@@ -169,9 +174,19 @@ export function init({ root, onError, setBadge }) {
       if (!n.info.matched) parts.push(n.info.level === 0 ? "rolled up" : "not matched");
       return parts.join(" · ");
     }
-    if (n.kind === "group") return `${fmt.int(n.leaves)} ${key === "clusters" ? "clusters" : key}`;
-    if (n.kind === "cluster") return n.info.iptc_label ? `per-post majority: ${n.info.iptc_label}` : "";
+    if (n.kind === "group") return count(n.leaves, key);
+    if (n.kind === "cluster") return n.info.iptc_label ? `most common post topic: ${n.info.iptc_label}` : "";
     return n.info.description || "";
+  }
+
+  // A person's portrait or a company's industry icon before the name; sector and industry rows get their icon too.
+  function pic(n, size) {
+    if (n.kind === "entity" && (key === "people" || key === "companies")) return entityBadge(key, { label: n.label, ...n.info }, size);
+    if (key === "companies" && n.kind === "group") {
+      const e = n.info.level === "industry" ? { industry: n.label, sector: tree.byId.get(n.parent)?.label } : { sector: n.label };
+      return industryIcon(e, Math.round(size * 0.75));
+    }
+    return null;
   }
 
   function row(n, open, hit = false) {
@@ -181,7 +196,7 @@ export function init({ root, onError, setBadge }) {
       tabindex: "-1", "data-id": n.id, style: `padding-left:${n.depth * 18 + 6}px`,
       onclick: () => { if (has && !q) flip(n); select(n.id); } },
       el("span", { class: "caret", "aria-hidden": "true" }, has ? (open ? "▾" : "▸") : ""),
-      el("span", { class: "nm" }, el("span", { class: "lb" }, n.label), el("span", { class: "sb" }, sub(n))),
+      el("span", { class: "nm" }, pic(n, 20), el("span", { class: "lb" }, n.label), el("span", { class: "sb" }, sub(n))),
       el("span", { class: "tree-val", title: `${fmt.int(n.total)} ${tree.about.metric}` },
         el("span", { class: "track" }, el("span", { class: "b", style: `width:${n.total ? Math.max(2, Math.round((n.total / max) * 100)) : 0}%` })),
         el("span", { class: "n" }, fmt.int(n.total))));
@@ -227,7 +242,8 @@ export function init({ root, onError, setBadge }) {
     for (let p = tree.byId.get(n.parent); p; p = tree.byId.get(p.parent)) path.unshift(p.label);
     const metric = tree.about.metric === "mentions" ? "mentions" : "posts";
     if (path.length) detail.append(el("div", { class: "crumb" }, path.join(" › ")));
-    detail.append(el("h2", { class: "tax-title" }, n.label));
+    const picture = pic(n, 44);
+    detail.append(el("h2", { class: picture ? "tax-title with-pic" : "tax-title" }, picture, n.label));
     const l = link(n);
     const stats = el("div", { class: "stats" });
     if (key === "iptc") {
@@ -236,11 +252,10 @@ export function init({ root, onError, setBadge }) {
     } else if (n.kind === "entity") {
       stats.append(stat(fmt.int(n.total), metric), stat(fmt.int(n.info.sitelinks), "Wikipedia editions"), stat(fmt.int(n.info.n_aliases), "aliases"));
     } else if (n.kind === "cluster") {
-      stats.append(stat(fmt.int(n.total), "posts"), stat(n.info.label_source === "llm" ? "LLM" : n.info.label_source, "named by"),
-        stat(fmt.pct(n.info.iptc_l1_share), "posts on the per-post majority subject"));
+      stats.append(stat(fmt.int(n.total), "posts"), stat(n.info.label_source === "llm" ? "LLM" : n.info.label_source, "named by"));
     } else {
-      stats.append(stat(fmt.int(n.total), metric), stat(fmt.int(n.leaves), key === "clusters" ? "clusters" : "entries"),
-        stat(fmt.int(countSeen(n)), "seen in period"));
+      stats.append(stat(fmt.int(n.total), metric), stat(fmt.int(n.leaves), NOUN[key][1]),
+        stat(fmt.int(countSeen(n)), key === "clusters" ? "with posts" : "seen in period"));
     }
     detail.append(stats);
     const text = n.info.definition || n.info.description;
@@ -252,8 +267,9 @@ export function init({ root, onError, setBadge }) {
       n.info.n_aliases > n.info.aliases.length ? ` (+${n.info.n_aliases - n.info.aliases.length} more)` : ""));
     if (n.info.source === "pageviews") detail.append(el("p", {}, "In the list because of recent Wikipedia page views, not the Vital Articles list."));
     if (n.kind === "cluster") {
-      detail.append(el("p", {}, el("strong", {}, "Subject chosen by the LLM: "), n.info.subject || "none (no shared subject)"));
-      if (n.info.iptc_label) detail.append(el("p", {}, el("strong", {}, "Per-post IPTC majority: "), `${n.info.iptc_label} (${n.info.iptc_l1})`));
+      detail.append(el("p", {}, el("strong", {}, "Subject chosen for the cluster: "), n.info.subject || "none (no shared subject)"));
+      if (n.info.iptc_label) detail.append(el("p", {}, el("strong", {}, "Per-post IPTC tags in this cluster: "),
+        `most common topic “${n.info.iptc_label}”; most common subject “${n.info.iptc_l1}”, on ${fmt.pct(n.info.iptc_l1_share)} of its posts.`));
       if (n.info.top_hashtags?.length) detail.append(el("div", { class: "pills" }, n.info.top_hashtags.map((t) => el("span", { class: "pill" }, "#" + t))));
     }
     if (n.kids.length) {

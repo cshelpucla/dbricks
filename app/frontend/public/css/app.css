@@ -43,7 +43,7 @@
 html, body { height: 100%; }
 body {
   margin: 0; background: var(--page); color: var(--ink);
-  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 14px/1.45 "Twemoji Country Flags", system-ui, -apple-system, "Segoe UI", sans-serif;
   display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 16px;
 }
 h1 { font-size: 18px; font-weight: 600; margin: 0; }
@@ -318,4 +318,25 @@ svg.geo:active { cursor: grabbing; }
 #tab-taxonomy .card a { color: var(--series-1); }
 #tab-taxonomy .pills { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
 #tab-taxonomy .kids { display: flex; flex-direction: column; margin-bottom: 8px; }
+.tax-fresh { padding-bottom: 7px; }
 @media (max-width: 600px) { .tree-val { grid-template-columns: 50px 52px; } .tree-row .sb { display: none; } }
+
+/* ---- pictures beside names (js/lib/badges.js): portraits for people, industry icons for companies, flags for countries */
+/* Windows ships no flag emoji (it shows two letters), so flags come from Twemoji Country Flags, limited to the flag code
+   points (country-flag-emoji-polyfill 0.1.8, MIT; Twemoji graphics CC-BY 4.0, Twitter, Inc. and contributors). */
+@font-face {
+  font-family: "Twemoji Country Flags";
+  unicode-range: U+1F1E6-1F1FF, U+1F3F4, U+E0062-E0063, U+E0065, U+E0067, U+E006C, U+E006E, U+E0073-E0074, U+E0077, U+E007F;
+  src: url("../vendor/TwemojiCountryFlags.woff2") format("woff2");
+  font-display: swap;
+}
+.avatar { position: relative; display: inline-grid; place-items: center; flex: none; width: var(--sz, 22px); height: var(--sz, 22px);
+  border-radius: 50%; overflow: hidden; background: var(--hover); box-shadow: inset 0 0 0 1px var(--border);
+  color: var(--ink-2); font-size: calc(var(--sz, 22px) * .4); font-weight: 600; line-height: 1; user-select: none; }
+.avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 20%; }
+.ind-icon { flex: none; color: var(--ink-2); }
+.mentions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.mention { display: inline-flex; align-items: center; gap: 5px; }
+td .mentions { gap: 2px 10px; }
+.tree-row .nm > .avatar, .tree-row .nm > .ind-icon { align-self: center; }
+.tax-title.with-pic { display: flex; align-items: center; gap: 10px; }

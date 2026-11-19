@@ -149,6 +149,8 @@ Batches of 32 inputs per request, 6 worker threads, 3 retries per batch with bac
 
 ### 7.3 Topic assignment
 
+The full description of this classifier, with its 2026-11-19 review, version 2 changes and the planned trained replacement, is [POST_CLASSIFIER.md](POST_CLASSIFIER.md). **Version 2** (in code 2026-11-19, not yet deployed) removes links without a scheme before embedding, applies the 25-character gate to the embedded text, and reports the media-and-entertainment and computing branches of *economy > products and services* under arts and under science and technology (`SUBJECT_OVERRIDES`).
+
 - `topic_taxonomy` embeddings are computed from `"<label>: <definition>"` (English, `en-GB`), bare, for all 1,059 active concepts (one-off cost: 23,792 tokens, 2 seconds).
 - Matching uses concepts at levels 1 to 3 (988 concepts) plus 12 "no topic" anchor phrases (greetings, small talk, short replies, jokes, vague opinions and similar). Each embedded post is compared with every row by cosine similarity. If the nearest row is an anchor, or the post is under 25 characters, it gets no IPTC topic. Otherwise the top 3 concepts at or above `TOPIC_MIN_SCORE` go to `post_topics`, and the best becomes `topic_qcode`.
 - `topic_l1` is the label of the level-0 ancestor, found by walking `parent_qcode`.

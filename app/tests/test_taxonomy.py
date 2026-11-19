@@ -48,6 +48,16 @@ def test_company_tree_nests_sector_industry_company():
     assert nodes["Q1"]["posts"] == 3 and nodes["Q2"]["posts"] == 0 and nodes["Q1"]["info"]["aliases"] == ["Acme Corp"]
 
 
+def test_people_tree_turns_the_portrait_file_into_a_commons_thumbnail():
+    rows = [("Q1", "Ada Lovelace", "mathematician", None, 0, 90, "Scientists", "vital", "Ada Lovelace portrait.jpg"),
+            ("Q2", "Nobody", "", None, 0, 30, None, "pageviews", None)]
+    nodes = {n["id"]: n for n in taxonomy.people_tree(rows, {})}
+    # Commons layout: thumb/<md5[0]>/<md5[:2]>/<file>/<width>px-<file>, spaces as underscores
+    assert nodes["Q1"]["info"]["image"] == ("https://upload.wikimedia.org/wikipedia/commons/thumb/a/a4/"
+                                            "Ada_Lovelace_portrait.jpg/120px-Ada_Lovelace_portrait.jpg")
+    assert nodes["Q2"]["info"]["image"] is None
+
+
 def _constants(path: Path) -> dict:
     """Module-level constants of a source file, without importing it (it needs numpy, Spark and so on)."""
     out = {}

@@ -3,6 +3,7 @@ import { getJSON, filterParams } from "../api.js";
 import { readTokens, trendColor } from "../colors.js";
 import { clear, el, fmt, svg } from "../lib/dom.js";
 import { multiSelect, singleSelect } from "../lib/controls.js";
+import { entityBadge, withFlag } from "../lib/badges.js";
 import { MapView } from "../mapview.js";
 
 const TIME = [[1, "Last hour"], [6, "Last 6 hours"], [24, "Last 24 hours"], [72, "Last 3 days"], [168, "Last 7 days"]];
@@ -25,9 +26,13 @@ export function init({ onError, setBadge }) {
   let sector = "";                                                  // Companies panel: show one sector only ("" = all)
   const names = new Map();                                          // entity id -> display name
   const nameOf = (id) => names.get(id) || id;
+  const info = new Map();                                           // entity id -> its /api/meta entry (portrait, industry, sector)
+  const badge = (kind, id, size) => entityBadge(kind, info.get(id) ?? { label: nameOf(id) }, size);
   // Top mentions with their share of the cluster; in a People/Companies mode the highlighted ones come first.
-  const mentions = (c, k) => [...c[k]].sort((a, b) => (s.colorBy === k && hl[k].has(b[0])) - (s.colorBy === k && hl[k].has(a[0])))
-    .slice(0, 3).map(([q, n]) => `${nameOf(q)} ${fmt.int(n)} (${fmt.pct(n / c.n)})`);
+  const topMentions = (c, k) => [...c[k]].sort((a, b) => (s.colorBy === k && hl[k].has(b[0])) - (s.colorBy === k && hl[k].has(a[0]))).slice(0, 3);
+  const mentionText = (c, q, n) => `${nameOf(q)} ${fmt.int(n)} (${fmt.pct(n / c.n)})`;
+  const mentions = (c, k) => topMentions(c, k).map(([q, n]) => mentionText(c, q, n));
+  const mentionChips = (c, k, list = topMentions(c, k)) => list.map(([q, n]) => el("span", { class: "mention" }, badge(k, q, 18), mentionText(c, q, n)));
   let mode = null, meta = null, data = { clusters: [], topics: [], total: 0 }, tokens = readTokens(), loadToken = 0;
 
   const map = new MapView($("topicMap"), {
@@ -86,9 +91,9 @@ export function init({ onError, setBadge }) {
   const filters = $("filters");
   const topicSel = multiSelect({ label: "Topic", fmtOpt: cap, searchable: true, onChange: (v) => change({ topics: v }) });
   const langSel = multiSelect({ label: "Language", fmtOpt: langName, searchable: true, onChange: (v) => change({ langs: v }) });
-  const countrySel = multiSelect({ label: "Country", fmtOpt: countryName, searchable: true, onChange: (v) => change({ countries: v }) });
-  const personSel = multiSelect({ label: "Person", fmtOpt: nameOf, searchable: true, onChange: (v) => change({ people: v }) });
-  const companySel = multiSelect({ label: "Company", fmtOpt: nameOf, searchable: true, onChange: (v) => change({ companies: v }) });
+  const countrySel = multiSelect({ label: "Country", fmtOpt: (c) => withFlag(c, countryName(c)), searchable: true, onChange: (v) => change({ countries: v }) });
+  const personSel = multiSelect({ label: "Person", fmtOpt: nameOf, iconOf: (q) => badge("people", q, 20), searchable: true, onChange: (v) => change({ people: v }) });
+  const companySel = multiSelect({ label: "Company", fmtOpt: nameOf, iconOf: (q) => badge("companies", q, 20), searchable: true, onChange: (v) => change({ companies: v }) });
   const conf = el("input", { type: "range", min: "0", max: "0.9", step: "0.05", value: "0", id: "conf", "aria-label": "Minimum topic confidence" });
   const confOut = el("output", { for: "conf", class: "muted" }, "any");
   conf.addEventListener("input", () => { confOut.textContent = +conf.value ? `≥ ${(+conf.value).toFixed(2)}` : "any"; change({ minScore: +conf.value }, true); });
@@ -136,7 +141,7 @@ export function init({ onError, setBadge }) {
     mode = meta.mode; setBadge(mode);
     topicSel.setOptions(meta.topics); langSel.setOptions(meta.langs); countrySel.setOptions(meta.countries);
     for (const k of Object.keys(hl)) {
-      for (const p of meta[k] ?? []) names.set(p.value, p.label);
+      for (const p of meta[k] ?? []) { names.set(p.value, p.label); info.set(p.value, p); }
       for (const id of [...hl[k].keys()]) if (!(meta[k] ?? []).some((x) => x.value === id)) hl[k].delete(id);
       if (!hl[k].size) (meta[k] ?? []).slice(0, MAX_HIGHLIGHTS).forEach((p, i) => hl[k].set(p.value, i));
     }
@@ -172,7 +177,7 @@ export function init({ onError, setBadge }) {
   const glyph = () => svg("svg", { class: "glyph", width: 18, height: 18, viewBox: "0 0 18 18", "aria-hidden": "true" },   // a bubble with a core
     svg("circle", { cx: 9, cy: 9, r: 8, style: "fill:var(--other)" }),
     svg("circle", { cx: 9, cy: 9, r: 4, style: "fill:var(--ink-2);stroke:var(--surface);stroke-width:1.5" }));
-  const swatch = (color, text) => el("span", { class: "k-item" }, el("span", { class: "sw on", style: `background:${color}` }), text);
+  const swatch = (color, text, icon) => el("span", { class: "k-item" }, el("span", { class: "sw on", style: `background:${color}` }), icon, text);
   function renderKey() {
     const box = clear($("mapKey"));
     const head = (mode, what) => el("span", {}, el("strong", {}, mode), ` · ${what}`);
@@ -182,7 +187,7 @@ export function init({ onError, setBadge }) {
     } else if (s.colorBy in hl) {
       const picks = [...hl[s.colorBy]].sort((a, b) => a[1] - b[1]);
       box.append(glyph(), head(cap(s.colorBy), "coloured core = the cluster's posts that mention"),
-        ...(picks.length ? picks.map(([q, slot]) => swatch(tokens.series[slot], nameOf(q))) : [el("span", {}, "(none picked: choose in the side panel)")]),
+        ...(picks.length ? picks.map(([q, slot]) => swatch(tokens.series[slot], nameOf(q), badge(s.colorBy, q, 20))) : [el("span", {}, "(none picked: choose in the side panel)")]),
         el("span", {}, "· grey = the rest of the cluster"));
     } else {
       const picks = [...s.highlights].sort((a, b) => a[1] - b[1]);
@@ -194,10 +199,14 @@ export function init({ onError, setBadge }) {
   // ---- legend
   // The panel for a colour mode that is not showing folds to one line: what it would highlight, and a way to show it.
   // No swatches there: the colours on the map now mean something else.
+  // picks: [name, slot, picture?]
   function folded(box, title, picks, mode) {
+    picks.sort((a, b) => a[1] - b[1]);
     box.append(el("div", { class: "card-head" }, el("h2", { text: title }),
         el("button", { class: "link", type: "button", onclick: () => setColorBy(mode) }, "Show on map")),
-      el("p", {}, picks.length ? picks.sort((a, b) => a[1] - b[1]).map((p) => p[0]).join(", ") : "None picked"));
+      !picks.length ? el("p", {}, "None picked")
+        : picks.some((p) => p[2]) ? el("p", { class: "mentions" }, picks.map(([t, , pic]) => el("span", { class: "mention" }, pic, t)))
+        : el("p", {}, picks.map((p) => p[0]).join(", ")));
   }
   function renderLegend() {
     const box = clear($("legend"));
@@ -224,7 +233,7 @@ export function init({ onError, setBadge }) {
       box.classList.toggle("active", s.colorBy === kind);
       if (!list.length) { box.hidden = true; continue; }              // nothing yet: the taxonomy jobs have not run
       box.hidden = false;
-      if (s.colorBy !== kind) { folded(box, title, [...hl[kind]].map(([q, slot]) => [nameOf(q), slot]), kind); continue; }
+      if (s.colorBy !== kind) { folded(box, title, [...hl[kind]].map(([q, slot]) => [nameOf(q), slot, badge(kind, q, 20)]), kind); continue; }
       box.append(el("h2", { text: title }), el("p", { id: `${boxId}Note`, text: `Pick up to ${MAX_HIGHLIGHTS}. A cluster's coloured core is the posts in it that mention them, on the same scale as the bubble, so a passing mention is a dot. Clusters where at least ${MIN_MENTIONS} posts and ${fmt.pct(MIN_MENTION_SHARE)} of the cluster mention one are labelled with the count.` }));
       if (kind === "companies") {                                     // sector > industry > company
         const sectors = [...new Set(list.map((t) => t.sector).filter(Boolean))].sort();
@@ -238,7 +247,7 @@ export function init({ onError, setBadge }) {
       for (const t of list.filter((t) => kind !== "companies" || !sector || t.sector === sector)) {
         const slot = hl[kind].get(t.value);
         rows.append(el("button", { class: "leg-row", type: "button", title: t.description || "", "aria-pressed": String(slot !== undefined), onclick: () => toggleEntity(kind, t.value) },
-          el("span", { class: slot === undefined ? "sw" : "sw on", style: slot === undefined ? "" : `background:${tokens.series[slot]}` }), t.label,
+          el("span", { class: slot === undefined ? "sw" : "sw on", style: slot === undefined ? "" : `background:${tokens.series[slot]}` }), entityBadge(kind, t, 24), t.label,
           kind === "companies" && t.industry ? el("span", { class: "sub" }, t.industry) : null, el("span", { class: "n" }, fmt.num(t.count))));
       }
       box.append(rows);
@@ -276,7 +285,7 @@ export function init({ onError, setBadge }) {
         el("div", { class: "stat" }, el("div", { class: "v" }, trendWord(c.trend)), el("div", { class: "k" }, "trend"))),
       c.langs.length ? el("p", {}, "Languages: " + c.langs.map(([l, sh]) => `${langName(l)} ${fmt.pct(sh)}`).join(" · ")) : null,
       c.score != null ? el("p", {}, `Average topic confidence ${c.score.toFixed(2)}`) : null,
-      ...["people", "companies"].map((k) => (mentions(c, k).length ? el("p", {}, `${cap(k)} mentioned: ${mentions(c, k).join(" · ")}`) : null)));
+      ...["people", "companies"].map((k) => (c[k].length ? el("p", { class: "mentions" }, `${cap(k)} mentioned:`, mentionChips(c, k)) : null)));
     const list = el("div", {}, el("p", { text: "Loading recent posts…" }));
     box.append(el("h2", { text: "Recent posts" }), list);
     const id = c.id;
@@ -288,7 +297,7 @@ export function init({ onError, setBadge }) {
       for (const p of res.posts) {
         const link = p.url && /^https:\/\/bsky\.app\//.test(p.url) ? el("a", { href: p.url, target: "_blank", rel: "noopener noreferrer" }, "Open") : null;
         list.append(el("div", { class: "post" }, el("div", { class: "t" }, p.text || ""),
-          el("div", { class: "m" }, [p.lang && langName(p.lang), p.place || (p.country && countryName(p.country)), fmt.ago(new Date(Date.now() - p.age_hours * 3600e3).toISOString())].filter(Boolean).map((t) => el("span", {}, t)), link)));
+          el("div", { class: "m" }, [p.lang && langName(p.lang), p.country ? withFlag(p.country, p.place || countryName(p.country)) : p.place, fmt.ago(new Date(Date.now() - p.age_hours * 3600e3).toISOString())].filter(Boolean).map((t) => el("span", {}, t)), link)));
       }
     } catch (err) { if (s.selected === id) { clear(list); list.append(el("p", { text: `Could not load posts: ${err.message}` })); } }
   }
@@ -306,7 +315,7 @@ export function init({ onError, setBadge }) {
       : k === "hits" ? hits(c).reduce((a, [, n]) => a + n, 0) : c[k] ?? -1);
     const cell = {
       label: (c) => cap(c.label) || "–", topic: (c) => cap(data.topics[c.topic]), n: (c) => fmt.int(c.n), share: (c) => fmt.pct(c.n / Math.max(1, data.total)),
-      hits: (c) => hits(c).map(([q, n]) => `${nameOf(q)} ${fmt.int(n)} (${fmt.pct(n / c.n)})`).join(" · ") || "–",
+      hits: (c) => (hits(c).length ? el("span", { class: "mentions" }, mentionChips(c, kind, hits(c))) : "–"),
       trend: (c) => trendWord(c.trend), langs: (c) => c.langs.map(([l, sh]) => `${l} ${fmt.pct(sh)}`).join(", "), score: (c) => (c.score == null ? "–" : c.score.toFixed(2)),
     };
     const rows = [...data.clusters].sort((a, b) => { const x = val(a, s.sort.key), y = val(b, s.sort.key); return (x > y ? 1 : x < y ? -1 : 0) * s.sort.dir; });

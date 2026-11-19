@@ -9,4 +9,5 @@ SELECT cluster_id,
        -- newer half of the data actually present (not of the window, which may predate the data)
        sum(CASE WHEN age_h < (SELECT max(age_h) FROM base) / 2 THEN 1 ELSE 0 END) AS recent
 FROM base
+WHERE cluster_id IS NOT NULL
 GROUP BY cluster_id

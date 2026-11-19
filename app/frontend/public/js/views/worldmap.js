@@ -2,6 +2,7 @@
 import { getJSON } from "../api.js";
 import { clear, el, fmt, svg } from "../lib/dom.js";
 import { multiSelect, singleSelect } from "../lib/controls.js";
+import { entityBadge, withFlag } from "../lib/badges.js";
 
 const TIME = [[1, "Last hour"], [6, "Last 6 hours"], [24, "Last 24 hours"], [72, "Last 3 days"], [168, "Last 7 days"]];
 const CONF = [[0.4, "0.4 or more (default)"], [0.5, "0.5 or more"], [0.6, "0.6 or more"], [0.3, "0.3 or more (looser)"]];
@@ -46,6 +47,8 @@ export function init({ root, onError, setBadge }) {
   const s = { hours: 24, minConf: 0.4, level: "place", topics: [], people: [], companies: [] };
   const names = new Map();                                          // person or company Wikidata id -> display name
   const nameOf = (id) => names.get(id) || id;
+  const info = new Map();                                           // id -> its entry from /api/geo (portrait, industry, sector)
+  const badge = (kind, id) => entityBadge(kind, info.get(id) ?? { label: nameOf(id) }, 20);
   let mode = null, data = null, countries = null, view = { x: -2.75, y: -1.36, w: 5.5, h: 2.72 }, base = { ...view };
   const filters = el("div", { class: "filters" });
   const summary = el("div", { class: "summary" });
@@ -62,8 +65,8 @@ export function init({ root, onError, setBadge }) {
     el("aside", { class: "side" }, legend, table)));
 
   const topicSel = multiSelect({ label: "Topic", fmtOpt: cap, searchable: true, onChange: (v) => { s.topics = v; load(); } });
-  const personSel = multiSelect({ label: "Person", fmtOpt: nameOf, searchable: true, onChange: (v) => { s.people = v; load(); } });
-  const companySel = multiSelect({ label: "Company", fmtOpt: nameOf, searchable: true, onChange: (v) => { s.companies = v; load(); } });
+  const personSel = multiSelect({ label: "Person", fmtOpt: nameOf, iconOf: (q) => badge("people", q), searchable: true, onChange: (v) => { s.people = v; load(); } });
+  const companySel = multiSelect({ label: "Company", fmtOpt: nameOf, iconOf: (q) => badge("companies", q), searchable: true, onChange: (v) => { s.companies = v; load(); } });
   filters.append(
     singleSelect({ label: "Time window", options: TIME.map(([value, label]) => ({ value, label })), value: s.hours, onChange: (v) => { s.hours = v; load(); } }).el,
     singleSelect({ label: "Show", options: LEVELS.map(([value, label]) => ({ value, label })), value: s.level, onChange: (v) => { s.level = v; load(); } }).el,
@@ -105,7 +108,7 @@ export function init({ root, onError, setBadge }) {
       if (s.companies.length) params.set("company", s.companies.join(","));
       data = await getJSON("/api/geo", params);
       mode = data.mode; setBadge(mode); onError(null);
-      for (const p of [...(data.people ?? []), ...(data.companies ?? [])]) names.set(p.value, p.label);
+      for (const p of [...(data.people ?? []), ...(data.companies ?? [])]) { names.set(p.value, p.label); info.set(p.value, p); }
       topicSel.setOptions(data.topics);
       personSel.setOptions((data.people ?? []).map(({ value, count }) => ({ value, count })));
       companySel.setOptions((data.companies ?? []).map(({ value, count }) => ({ value, count })));
@@ -127,7 +130,7 @@ export function init({ root, onError, setBadge }) {
       const label = `${p.name && p.level !== "country" && s.level === "place" ? p.name : countryName(p.country || p.name)}`;
       const show = (ev) => {
         clear(tip).append(el("div", { class: "v" }, `${fmt.int(p.n)} posts`),
-          el("div", { class: "l" }, s.level === "country" ? countryName(p.country) : `${p.name}${p.country && p.name !== p.country ? ", " + countryName(p.country) : ""}`),
+          el("div", { class: "l" }, withFlag(p.country, s.level === "country" ? countryName(p.country) : `${p.name}${p.country && p.name !== p.country ? ", " + countryName(p.country) : ""}`)),
           el("div", { class: "s" }, `Most common topic: ${cap(p.topic)}`));
         tip.hidden = false;
         const hr = host.getBoundingClientRect(), cx = (ev.clientX ?? hr.left + hr.width / 2) - hr.left, cy = (ev.clientY ?? hr.top + 40) - hr.top;
@@ -158,7 +161,7 @@ export function init({ root, onError, setBadge }) {
     clear(table).append(el("h2", { text: `Top ${s.level === "place" ? "places" : "countries"}` }), el("table", {},
       el("thead", {}, el("tr", {}, ["", s.level === "place" ? "Place and top topic" : "Country and top topic", "Posts", "Share"].map((h, i) => el("th", { class: i >= 2 ? "num" : "" }, h)))),
       el("tbody", {}, top.map((p, i) => el("tr", {}, el("td", { class: "muted" }, String(i + 1)),
-        el("td", {}, s.level === "place" ? `${p.name}${p.country && p.name !== p.country ? ` (${p.country})` : ""}` : countryName(p.country),
+        el("td", {}, withFlag(p.country, s.level === "place" && p.name && p.name !== p.country ? p.name : countryName(p.country || p.name)),
           el("div", { class: "muted small" }, cap(p.topic))),
         el("td", { class: "num" }, fmt.int(p.n)), el("td", { class: "num" }, fmt.pct(p.n / total)))))));
   }

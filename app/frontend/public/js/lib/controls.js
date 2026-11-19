@@ -20,8 +20,9 @@ function popover(field, button, build) {
   return { pop, close };
 }
 
-/** options: [{value, count?, label?}]. Calls onChange(selectedValues). Empty selection means "all". */
-export function multiSelect({ label, fmtOpt = (v) => v, onChange, searchable = false }) {
+/** options: [{value, count?, label?}]. Calls onChange(selectedValues). Empty selection means "all".
+ *  iconOf(value), if given, returns a small node (portrait, icon) shown before each option's text. */
+export function multiSelect({ label, fmtOpt = (v) => v, iconOf = null, onChange, searchable = false }) {
   let options = [], selected = [];
   const field = el("div", { class: "field" }), button = el("button", { class: "btn", type: "button" });
   field.append(el("span", { class: "lbl" }, label), button);
@@ -38,7 +39,7 @@ export function multiSelect({ label, fmtOpt = (v) => v, onChange, searchable = f
       const on = selected.includes(o.value);
       p.append(el("div", { class: "opt", role: "checkbox", "aria-checked": String(on), tabindex: "0",
         onclick: () => toggle(o.value, p, q), onkeydown: (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); toggle(o.value, p, q); } } },
-        on ? check() : el("span", { class: "tick" }), fmtOpt(o.value), o.count != null && el("span", { class: "n" }, o.count.toLocaleString())));
+        on ? check() : el("span", { class: "tick" }), iconOf?.(o.value), fmtOpt(o.value), o.count != null && el("span", { class: "n" }, o.count.toLocaleString())));
     }
     p.append(el("div", { class: "foot" }, el("button", { class: "link", type: "button", onclick: () => { selected = []; summary(); onChange(selected); paint(p, q); } }, "Clear")));
   }

@@ -91,9 +91,18 @@ class WarehouseSource:
             out["people" if kind == "person" else "companies"].append(
                 {"value": qid, "label": label, "description": description, "count": int(c),
                  "sector": sector if kind == "company" else None, "industry": industry, "image": thumb_url(image)})
-        computed, points = self._run(f"SELECT cast(max(computed_at) AS STRING), count(*) FROM {config.CATALOG}.{config.SCHEMA}.post_map", {})[0]
+        computed, points = self._map_stamp()
         return {"mode": self.mode, "hours": hours, "total": total, **out,
                 "map_computed_at": computed.replace(" ", "T") + "Z" if computed else None, "map_points": int(points or 0)}
+
+    def _map_stamp(self) -> list:
+        """[newest map run, posts the layout was built from]. post_map also holds posts placed by their neighbours,
+        so only in_sample rows count; maps written before that column existed (2026-11-19) are all sample."""
+        table = f"{config.CATALOG}.{config.SCHEMA}.post_map"
+        try:
+            return self._run(f"SELECT cast(max(computed_at) AS STRING), count_if(in_sample) FROM {table}", {})[0]
+        except Exception:                                    # noqa: BLE001 - older map without in_sample
+            return self._run(f"SELECT cast(max(computed_at) AS STRING), count(*) FROM {table}", {})[0]
 
     def _exec_entities(self, where: str, params: dict) -> list[list]:
         """People and companies for the filter panels. Empty (not an error) until the taxonomy jobs have run."""

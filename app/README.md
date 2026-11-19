@@ -1,11 +1,12 @@
 # Bluesky Analytics app
 
-A Databricks App (FastAPI backend, plain-JavaScript frontend with no build step) with seven tabs:
+A Databricks App (FastAPI backend, plain-JavaScript frontend with no build step) with these tabs:
 
 | Tab | Shows | Data |
 |---|---|---|
 | Topic map | Topic clusters as bubbles on a 2D map, named by an LLM, with filters (time, topic, language, country, confidence, location, text search); the Topic filter is cluster-level | Live: `post_map` + `topic_clusters` + `post_enriched` (falls back to labelled demo data if they are empty) |
 | World map | Bubbles sized by post volume at each inferred location (places or countries), Equal Earth projection, filters for time, location confidence and topic | Live: `post_enriched` |
+| Taxonomies | The vocabularies that tag posts and name the map: IPTC Media Topics (1,059 concepts, 6 levels), people (Wikipedia Vital Articles + top pageviews), companies (sector > industry > company from Wikidata) and the map's LLM-named clusters grouped by their IPTC subject. Each is a searchable tree with posts or mentions per entry for the period, entry details (definition, aliases, Wikidata/IPTC link) and how it is applied (matching rules mirrored from `bluesky/src`; `tests/test_taxonomy.py` fails if they drift) | Live: `topic_taxonomy`, `taxonomy_people`, `taxonomy_companies`, `topic_clusters`, counts from `post_topics` and `post_enriched` |
 | Pipelines | Status of each pipeline, rows pushed and data written per time bucket, table size and freshness, recent runs | Live: Delta table history, Jobs and Pipelines APIs |
 | Costs | DBU spend by product, SKU or resource, list-price estimates | `system.billing.usage` and `list_prices`; shows an access message until granted |
 | Ask | Chat with a model (Databricks serving endpoint, `CHAT_ENDPOINT`) that queries the posts and draws Plotly or Chart.js charts. The model fills in a structured query; the app validates it and runs it as one SQL statement on the warehouse over every post in the window (polars in demo mode). Progress, tables and charts stream to the browser as server-sent events (`POST /api/chat/stream`). Agent loop: Pydantic AI + Pydantic AI Harness (`ToolBudgets`, `DetectLoops`). Conversations are saved per user | Live: `post_enriched` (+ `post_map` for clusters); history in Delta table `chat_messages` in the app schema, written in the background (the deploy script grants `CREATE TABLE, MODIFY`). Demo: SQLite `.chat.sqlite` |
@@ -21,7 +22,7 @@ app/
     main.py             entry point (API under /api, UI served from frontend/public)
     config.py           settings from the environment
     models.py           validated request filters
-    routes/             clusters.py (map), ops.py (pipelines, costs, data model)
+    routes/             clusters.py (map), ops.py (pipelines, costs, data model), taxonomy.py (Taxonomies tab)
     services/           demo.py, warehouse.py, auto.py (map sources), pipelines.py, costs.py,
                         registry.py (resources the Pipelines tab reports on), sqlexec.py, shape.py
     queries/            SQL for the map (*.sql)

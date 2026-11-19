@@ -9,6 +9,7 @@ import random
 from .. import config
 from . import sqlexec
 from .cache import cached, pmap
+from .commons import thumb_url
 from .demo import COMPANIES, PEOPLE, SECTOR_OF, TOPICS, _qid
 
 KEYS = ("iptc", "people", "companies", "clusters")
@@ -132,14 +133,14 @@ def iptc_tree(rows, counts) -> list[dict]:
 
 
 def people_tree(rows, counts) -> list[dict]:
-    """rows: (qid, label, description, aliases, n_aliases, sitelinks, category, source)."""
+    """rows: (qid, label, description, aliases, n_aliases, sitelinks, category, source, image file name or None)."""
     groups, out = {}, []
-    for qid, label, desc, aliases, n_aliases, sitelinks, category, source in rows:
+    for qid, label, desc, aliases, n_aliases, sitelinks, category, source, image in rows:
         cat = category or NO_CATEGORY
         gid = groups.setdefault(cat, "cat:" + cat)
         out.append({"id": qid, "label": label, "parent": gid, "kind": "entity", "posts": counts.get(qid, 0),
                     "info": {"description": desc, "aliases": _arr(aliases)[:ALIAS_CAP], "n_aliases": _int(n_aliases),
-                             "sitelinks": _int(sitelinks), "source": source}})
+                             "sitelinks": _int(sitelinks), "source": source, "image": thumb_url(image)}})
     return [{"id": g, "label": c, "parent": None, "kind": "group", "posts": 0, "info": {}} for c, g in groups.items()] + out
 
 
@@ -224,7 +225,8 @@ class LiveTaxonomy:
         since = "event_time > current_timestamp() - make_interval(0, 0, 0, 0, :hours, 0, 0)"
         posts_sql = f"""
 SELECT sum(CASE WHEN NOT is_filtered THEN 1 ELSE 0 END), sum(CASE WHEN NOT is_filtered AND embedded THEN 1 ELSE 0 END),
-       sum(CASE WHEN NOT is_filtered AND topic_qcode IS NOT NULL THEN 1 ELSE 0 END)
+       sum(CASE WHEN NOT is_filtered AND topic_qcode IS NOT NULL THEN 1 ELSE 0 END),
+       (SELECT max(event_time) FROM {_fq('post_enriched')} WHERE event_date >= current_date() - 7)
 FROM {_fq('post_enriched')} WHERE {since}"""
         tags_sql = f"""
 SELECT topic_type, count(DISTINCT uri), count(DISTINCT topic_id)
@@ -232,12 +234,12 @@ FROM {_fq('post_topics')} WHERE {since} AND topic_type IN ('iptc', 'person', 'co
 GROUP BY 1"""
         sizes, posts, tags = pmap(lambda f: f(), [self._sizes, lambda: sqlexec.run(posts_sql, params),
                                                   lambda: sqlexec.run(tags_sql, params)])
-        clean, embedded, with_topic = (_int(v) for v in posts[0])
+        clean, embedded, with_topic = (_int(v) for v in posts[0][:3])
         used = {t: (_int(u), _int(d)) for t, u, d in tags}
         window = {"clean": clean, "embedded": embedded, "with_topic": with_topic,
                   "with_person": used.get("person", (0, 0))[0], "people_seen": used.get("person", (0, 0))[1],
                   "with_company": used.get("company", (0, 0))[0], "companies_seen": used.get("company", (0, 0))[1],
-                  "concepts_seen": used.get("iptc", (0, 0))[1]}
+                  "concepts_seen": used.get("iptc", (0, 0))[1], "newest": posts[0][3]}
         return {"mode": self.mode, "hours": hours, "window": window, "sizes": sizes,
                 "about": {k: {f: ABOUT[k][f] for f in ("name", "short", "metric")} for k in KEYS}}
 
@@ -254,7 +256,7 @@ GROUP BY 1"""
                           f"FROM {_fq('post_topics')} WHERE {since} AND topic_type = 'iptc' GROUP BY 1")
             rows, counts = pmap(lambda q: sqlexec.run(*q), [(rows_sql, None), (counts_sql, params)])
             return iptc_tree(rows, {q: (_int(b), _int(a)) for q, b, a in counts})
-        kind, table, last = (("person", "taxonomy_people", "category, source") if key == "people"
+        kind, table, last = (("person", "taxonomy_people", "category, source, get_json_object(to_json(struct(*)), '$.image')") if key == "people"
                              else ("company", "taxonomy_companies", "category, industry"))
         rows_sql = (f"SELECT qid, label, description, slice(aliases, 1, {ALIAS_CAP}), size(aliases), sitelinks, {last} "
                     f"FROM {_fq(table)}")
@@ -291,7 +293,7 @@ class DemoTaxonomy:
         for names in COMPANIES.values():
             for n in names:
                 seen_c.setdefault(n, SECTOR_OF.get(n, ("Other", None)))
-        self.people = [(_qid(n), n, "Demo entry", "[]", 0, 300 - 7 * i, cat, "vital" if cat else "pageviews")
+        self.people = [(_qid(n), n, "Demo entry", "[]", 0, 300 - 7 * i, cat, "vital" if cat else "pageviews", None)
                        for i, (n, cat) in enumerate(seen_p.items())]
         self.companies = [(_qid(n), n, "Demo entry", "[]", 0, 250 - 6 * i, s, ind) for i, (n, (s, ind)) in enumerate(seen_c.items())]
         self.entity_w = {r[0]: rng.random() ** 2 for r in self.people + self.companies}
@@ -312,7 +314,7 @@ class DemoTaxonomy:
                               "posts": sum(r[4] for r in self.clusters), "posts_with_subject": sum(r[4] for r in self.clusters if r[2])}}
         window = {"clean": int(k * 50), "embedded": int(k * 19), "with_topic": int(k * 5.2), "with_person": int(k * 1.9),
                   "people_seen": n_people, "with_company": int(k * 0.8), "companies_seen": n_comp,
-                  "concepts_seen": len(self.weights)}
+                  "concepts_seen": len(self.weights), "newest": None}
         return {"mode": self.mode, "hours": hours, "window": window, "sizes": sizes,
                 "about": {k_: {f: ABOUT[k_][f] for f in ("name", "short", "metric")} for k_ in KEYS}}
 

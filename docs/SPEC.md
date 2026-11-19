@@ -129,9 +129,11 @@ Rules: Latin-script names require capitalisation; a small list of ambiguous name
 | `post_geo` | post x geo candidate | `uri, event_time, place, country_code, lat, lon, kind, confidence, matched_text` |
 | `topic_taxonomy` | IPTC concept | `qcode, label, definition, parent_qcode, level, path, embedding` |
 | `bot_accounts` | account | `did, score, reasons, first_seen` |
-| `post_map` | post | `uri, x, y, cluster_id, computed_at` (snapshot, overwritten) |
+| `post_map` | post | `uri, x, y, cluster_id, computed_at` (snapshot, overwritten); in code but not yet deployed: one row per embedded post of the window, plus `in_sample, cluster_share, cluster_topic` |
 
 ## 7. Topic map job **[built and running]**
+
+**2026-11-19 review and changes:** [TOPIC_IDENTIFICATION.md](TOPIC_IDENTIFICATION.md). The changes are in code but not yet deployed: languages centred before layout, every embedded post placed in a cluster through its nearest sampled neighbours (`post_map.cluster_topic` becomes a post's main topic), unclustered posts kept in the app's counts, and a consistent IPTC hint for the namer. The steps below describe the deployed version.
 
 Scheduled serverless job `bluesky-topic-map` (`bluesky/src/map_job.py`, logic in `map_lib.py`), every 2 hours at minute 0 UTC (`MAP_SCHEDULE`). Each run:
 
