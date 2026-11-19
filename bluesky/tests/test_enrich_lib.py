@@ -79,6 +79,16 @@ def test_embed_text_cleaning():
     assert len(E.embed_text("x" * 900)) == 500
 
 
+def test_links_without_a_scheme_are_not_embedded():
+    assert E.embed_text("en.wikipedia.org/wiki/Roger_C...") is None                # a link alone is not a topic
+    assert E.clean_text("ﾊﾔｵﾁｬﾝ好きそう youtu.be/IWWwBIq05yY?...") == "ﾊﾔｵﾁｬﾝ好きそう"
+    assert E.clean_text("Read archive.ph/yIJcs and open.spotify.com/episode/4KOs... now") == "Read and now"
+    assert E.embed_text("archive.ph/yIJcs", "Loyalists were present at Drumcree") == "Loyalists were present at Drumcree"
+    kept = "The U.S./China deal, 24/7 news, and/or e.g. a 1.5x/day dose"           # not links
+    assert E.clean_text(kept) == kept
+    assert E.URL_RE.findall("see archive.ph/x") == []                               # bot and geo rules unchanged
+
+
 def test_link_domain():
     assert E.link_domain("https://www.bbc.co.uk/news/1") == "bbc.co.uk" and E.link_domain(None) is None
 
@@ -264,6 +274,16 @@ def test_anchor_means_no_topic():
     assert out[1] == []                                                 # nearest is the anchor
     assert [j for j, _ in out[2]] == [1]
     assert E.ANCHORS and E.EMBED_INSTRUCTION.endswith("Query: ")
+
+
+def test_subject_remap_for_consumer_subjects():
+    econ, ps = "medtop:04000000", "medtop:20000209"
+    assert E.subject_qcode([econ, ps, "medtop:20000304", "medtop:20000308"]) == "medtop:01000000"   # music industry: arts
+    assert E.subject_qcode([econ, ps, "medtop:20000304"]) == "medtop:01000000"                      # the branch itself
+    assert E.subject_qcode([econ, ps, "medtop:20000225", "medtop:20000231"]) == "medtop:13000000"   # software: science
+    assert E.subject_qcode([econ, ps, "medtop:20000304", "medtop:20000305"]) == econ                # advertising stays
+    assert E.subject_qcode([econ, ps, "medtop:20000243"]) == econ                                   # consumer goods stay
+    assert E.subject_qcode(("medtop:15000000", "medtop:20001124")) == "medtop:15000000"            # elsewhere: the root
 
 
 def test_next_window_stays_behind_tail():

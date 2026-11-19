@@ -279,7 +279,7 @@ WHERE collection = 'app.bsky.feed.post' AND operation = 'create'
             P = E.l2_normalise(np.stack([embedded[i] for i in idx]))
             results = E.assign_topics(P, self.M, 3, self.args.topic_min_score, self.n_anchors)
             for i, res in zip(idx, results):
-                if len(df.at[i, "text"] or "") < E.TOPIC_MIN_CHARS or not res:
+                if len(df.at[i, "embed_text"]) < E.TOPIC_MIN_CHARS or not res:    # the text that was embedded, links removed
                     continue
                 for rank, (j, score) in enumerate(res, 1):
                     c = self.match[j]
@@ -309,7 +309,7 @@ WHERE collection = 'app.bsky.feed.post' AND operation = 'create'
         for i, r in df.iterrows():
             b = best.get(i)
             topic = topic_of.get(i)
-            l1 = self.tax[topic[0]["path_codes"][0]]["label"] if topic else None
+            l1 = self.tax[E.subject_qcode(topic[0]["path_codes"])]["label"] if topic else None
             v = embedded.get(i)
             out.append({
                 "uri": r["uri"], "did": r["did"], "time_us": int(r["time_us"]), "event_time": r["event_time"].to_pydatetime(),

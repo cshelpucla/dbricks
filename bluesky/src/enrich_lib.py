@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 import numpy as np
 import pandas as pd
 
-VERSION = 1
+VERSION = 2              # 2: bare links stripped before embedding, topic gate on embedded text, IPTC subject remap
 
 # ---- bot and spam rules (spec section 5) -------------------------------------------------------
 BOT_THRESHOLD = 4
@@ -38,13 +38,17 @@ SPAM_RE = re.compile(
     re.I)
 
 URL_RE = re.compile(r"https?://\S+|www\.\S+", re.I)
+# A link as clients display it in the post text, without a scheme ("en.wikipedia.org/wiki/Roger_C..."): a dotted
+# host followed by a path. Used only for embedding text, so the bot and geo rules see the same URLs as before.
+BARE_URL_RE = re.compile(r"\b(?:[a-z0-9-]+\.)+[a-z]{2,}/\S*", re.I)
 
 # ---- text helpers ------------------------------------------------------------------------------
 
 
 def clean_text(text) -> str:
-    """Text without URLs and extra whitespace, for embedding."""
-    return re.sub(r"\s+", " ", URL_RE.sub(" ", text if isinstance(text, str) else "")).strip()
+    """Text without URLs (with or without a scheme) and extra whitespace, for embedding."""
+    t = URL_RE.sub(" ", text if isinstance(text, str) else "")
+    return re.sub(r"\s+", " ", BARE_URL_RE.sub(" ", t)).strip()
 
 
 def embed_text(text, link_title=None, max_chars=500, min_chars=12) -> str | None:
@@ -557,6 +561,26 @@ ANCHORS = [
     "thanks, congratulations or good wishes", "a vague opinion without a clear subject",
     "a status update with no particular subject",
 ]
+# IPTC files these subjects under economy > products and services, so a post about an album or an app counted as
+# economy (75% of all economy matches on 2026-11-19, "music industry" alone over 3,000 posts a day). Such posts are
+# about the subject, not the business, so topic_l1 reports them under the subject's own top level, as the cluster
+# namer already does. Concept (and everything below it) -> top-level concept reported instead.
+SUBJECT_OVERRIDES = {
+    "medtop:20000304": "medtop:01000000",   # media and entertainment industry -> arts, culture, entertainment and media
+    "medtop:20000225": "medtop:13000000",   # computing and information technology -> science and technology
+}
+SUBJECT_KEEP = {"medtop:20000305", "medtop:20000312"}   # advertising and public relations stay business topics
+
+
+def subject_qcode(path_codes) -> str:
+    """The top-level concept a concept is reported under: the root of its path, unless SUBJECT_OVERRIDES moves
+    its branch."""
+    path_codes = list(path_codes)
+    if path_codes[-1] not in SUBJECT_KEEP:
+        for q in reversed(path_codes):
+            if q in SUBJECT_OVERRIDES:
+                return SUBJECT_OVERRIDES[q]
+    return path_codes[0]
 
 
 def parse_iptc(doc: dict) -> list[dict]:
