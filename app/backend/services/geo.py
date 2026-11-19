@@ -5,8 +5,9 @@ from collections import Counter
 from .. import config
 from . import sqlexec
 from .cache import cached, pmap
+from .commons import thumb_url
 from .demo import COMPANIES, PEOPLE, _qid
-from .warehouse import _in
+from .warehouse import _in, entity_info
 
 LEVELS = ("place", "country")
 MAX_POINTS = 1500
@@ -56,7 +57,7 @@ SELECT topic_l1, count(*) {window} AND geo_confidence >= :conf AND geo_lat IS NO
 GROUP BY 1 ORDER BY 2 DESC"""
         # dropdown options, like the topics: every located post in the window, not narrowed by the other filters
         entities_sql = f"""
-SELECT kind, qid, label, c FROM (
+SELECT r.kind, r.qid, r.label, x.description, x.sector, x.industry, x.image, r.c FROM (
   SELECT pt.topic_type AS kind, pt.topic_id AS qid, max(pt.topic_label) AS label, count(DISTINCT e.uri) AS c,
          row_number() OVER (PARTITION BY pt.topic_type ORDER BY count(DISTINCT e.uri) DESC) AS rk
   FROM {t} e
@@ -64,16 +65,18 @@ SELECT kind, qid, label, c FROM (
     AND pt.event_time > current_timestamp() - make_interval(0, 0, 0, 0, :hours, 0, 0)
   {where} AND e.geo_confidence >= :conf AND e.geo_lat IS NOT NULL
   GROUP BY 1, 2
-) WHERE rk <= {ENTITY_LIST_SIZE}
-ORDER BY kind, c DESC"""
+) r LEFT JOIN ({entity_info()}) x ON x.qid = r.qid
+WHERE r.rk <= {ENTITY_LIST_SIZE}
+ORDER BY r.kind, r.c DESC"""
         base = {"hours": params["hours"], "conf": params["conf"]}
         rows, totals, topic_counts, entity_counts = pmap(
             lambda q: sqlexec.run(q[0], q[1]),
             [(points_sql, params), (totals_sql, params), (topics_sql, base), (entities_sql, base)])
         totals = totals[0]
         ents = {"person": [], "company": []}
-        for kind, qid, label, c in entity_counts:
-            ents[kind].append({"value": qid, "label": label, "count": int(c)})
+        for kind, qid, label, description, sector, industry, image, c in entity_counts:
+            ents[kind].append({"value": qid, "label": label, "count": int(c), "description": description,
+                               "sector": sector if kind == "company" else None, "industry": industry, "image": thumb_url(image)})
         return {
             "mode": self.mode, "level": level, "hours": hours, "min_conf": min_conf,
             "total": int(totals[0] or 0), "located": int(totals[1] or 0),

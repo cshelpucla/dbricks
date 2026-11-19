@@ -281,3 +281,41 @@ svg.geo:active { cursor: grabbing; }
 
 /* Topic map job: healthy between scheduled runs */
 .pill.scheduled i { background: #0ca30c; }
+
+/* Taxonomies tab */
+.tax-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.tax-card { display: flex; flex-direction: column; gap: 2px; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; }
+.tax-card:hover { background: var(--hover); }
+.tax-card[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.tax-card .t { font-weight: 600; font-size: 13px; }
+.tax-card .v { font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.25; }
+.tax-card .u { font-size: 12px; font-weight: 400; color: var(--ink-2); }
+.tax-card .l { font-size: 12px; color: var(--ink-2); }
+.tax-stage .viz { min-height: 480px; }
+.tax-stage .toolbar .field input[type="search"] { width: 240px; }
+.tree-head { display: flex; justify-content: space-between; gap: 12px; padding: 6px 18px 6px 12px; border-bottom: 1px solid var(--grid); font-size: 12px; font-weight: 600; color: var(--ink-2); }
+.tree-scroll { flex: 1; min-height: 0; overflow: auto; padding: 4px 6px 8px; }
+.tree-row { display: grid; grid-template-columns: 14px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding-top: 5px; padding-bottom: 5px; padding-right: 6px; border-radius: 6px; cursor: pointer; }
+.tree-row:hover { background: var(--hover); }
+.tree-row.sel { background: var(--hover); box-shadow: inset 2px 0 0 var(--ink); }
+.tree-row .caret { color: var(--muted); font-size: 11px; text-align: center; }
+.tree-row .nm { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.tree-row .lb { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; max-width: 75%; }
+.tree-row .sb { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1 1 0; min-width: 0; }
+.tree-row.hit .lb { font-weight: 600; }
+.tree-row.zero .lb { color: var(--ink-2); }
+.tree-val { display: grid; grid-template-columns: 90px 58px; align-items: center; gap: 8px; }
+.tree-val .track { display: block; height: 6px; }
+.tree-val .b { display: block; height: 6px; border-radius: 3px; background: var(--series-1); }
+.tree-val .n { text-align: right; font-variant-numeric: tabular-nums; }
+.tree-more { padding: 4px 0; }
+.empty-row { color: var(--ink-2); padding: 12px; margin: 0; }
+.tax-title { font-size: 16px; margin: 2px 0 6px; }
+.tax-about ol.steps { margin: 0 0 8px; padding-left: 18px; color: var(--ink-2); font-size: 12px; }
+.tax-about ol.steps li { margin-bottom: 4px; }
+.tax-about details { font-size: 12px; color: var(--ink-2); }
+.tax-about summary { cursor: pointer; color: var(--ink); }
+#tab-taxonomy .card a { color: var(--series-1); }
+#tab-taxonomy .pills { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+#tab-taxonomy .kids { display: flex; flex-direction: column; margin-bottom: 8px; }
+@media (max-width: 600px) { .tree-val { grid-template-columns: 50px 52px; } .tree-row .sb { display: none; } }

@@ -2,6 +2,7 @@
 const TABS = {
   map: () => import("./views/map.js"),
   world: () => import("./views/worldmap.js"),
+  taxonomy: () => import("./views/taxonomy.js"),
   pipelines: () => import("./views/pipelines.js"),
   costs: () => import("./views/costs.js"),
   diagram: () => import("./views/diagram.js"),

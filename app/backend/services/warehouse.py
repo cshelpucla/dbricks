@@ -9,6 +9,7 @@ from pathlib import Path
 
 from .. import config
 from . import sqlexec
+from .commons import thumb_url
 
 QUERIES = Path(__file__).resolve().parent.parent / "queries"
 ENTITY_LIST_SIZE = 200          # people and companies offered per panel
@@ -19,6 +20,11 @@ def _sql(name: str, filters_sql: str = "", **extra) -> str:
     base = (QUERIES / "_base.sql").read_text().format(
         catalog=config.CATALOG, schema=config.SCHEMA, filters=filters_sql)
     return base + (QUERIES / name).read_text().format(catalog=config.CATALOG, schema=config.SCHEMA, **extra)
+
+
+def entity_info() -> str:
+    """Subquery: qid, description, sector, industry, image for every person and company in the taxonomies."""
+    return (QUERIES / "entity_info.sql").read_text().format(catalog=config.CATALOG, schema=config.SCHEMA)
 
 
 def _in(column: str, values: list[str], prefix: str, params: dict) -> str:
@@ -81,10 +87,10 @@ class WarehouseSource:
                     {"value": value, "count": int(c)})
         for k in out:
             out[k].sort(key=lambda d: -d["count"])
-        for kind, qid, label, description, sector, industry, c in self._exec_entities(where, params):
+        for kind, qid, label, description, sector, industry, image, c in self._exec_entities(where, params):
             out["people" if kind == "person" else "companies"].append(
                 {"value": qid, "label": label, "description": description, "count": int(c),
-                 "sector": sector if kind == "company" else None, "industry": industry})
+                 "sector": sector if kind == "company" else None, "industry": industry, "image": thumb_url(image)})
         computed, points = self._run(f"SELECT cast(max(computed_at) AS STRING), count(*) FROM {config.CATALOG}.{config.SCHEMA}.post_map", {})[0]
         return {"mode": self.mode, "hours": hours, "total": total, **out,
                 "map_computed_at": computed.replace(" ", "T") + "Z" if computed else None, "map_points": int(points or 0)}
@@ -92,7 +98,7 @@ class WarehouseSource:
     def _exec_entities(self, where: str, params: dict) -> list[list]:
         """People and companies for the filter panels. Empty (not an error) until the taxonomy jobs have run."""
         try:
-            return self._run(_sql("meta_entities.sql", where, limit=ENTITY_LIST_SIZE), params)
+            return self._run(_sql("meta_entities.sql", where, limit=ENTITY_LIST_SIZE, entity_info=entity_info()), params)
         except Exception as e:                               # noqa: BLE001 - tables may not exist yet
             log.warning("entity lists unavailable (taxonomy tables not built yet?): %s", str(e)[:120])
             return []

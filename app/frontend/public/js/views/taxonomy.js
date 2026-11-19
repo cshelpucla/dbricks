@@ -11,7 +11,7 @@ const MATCH_CAP = 400;          // search results shown
 
 export function init({ root, onError, setBadge }) {
   let mode = null, hours = 24, key = "iptc", overview = null, tree = null, loaded = false;
-  let sort = "posts", q = "", seenOnly = false, selected = null;
+  let sort = "posts", q = "", seenOnly = false, selected = null, openTop = false;
   const expanded = new Set(), showAll = new Set(), trees = new Map();
 
   const controls = el("div", { class: "row-controls" });
@@ -52,6 +52,7 @@ export function init({ root, onError, setBadge }) {
     const id = `${key}:${hours}`;
     if (!trees.has(id)) trees.set(id, index(await getJSON(`/api/taxonomies/${key}`, new URLSearchParams({ hours: String(hours) }))));
     tree = trees.get(id);
+    if (openTop) { tree.roots.forEach((r) => expanded.add(r.id)); openTop = false; }
     if (selected && !tree.byId.has(selected)) selected = null;
     paintSort(); paintTree(); paintDetail(); paintAbout();
   }
@@ -59,7 +60,7 @@ export function init({ root, onError, setBadge }) {
   async function pick(k) {
     if (k === key) return;
     key = k; selected = null; q = ""; search.value = ""; expanded.clear(); showAll.clear();
-    if (k === "clusters") expanded.add("*top");          // subjects open by default: the point is how clusters map to them
+    openTop = k === "clusters";          // subjects open by default: the point is how clusters map onto them
     paintCards();
     try { await loadTree(); onError(null); } catch (err) { onError(`Could not load ${k}: ${err.message}`); }
   }
@@ -123,7 +124,7 @@ export function init({ root, onError, setBadge }) {
     return [...list].sort(by);
   }
   const visible = (n) => !seenOnly || n.total > 0;
-  const isOpen = (n) => expanded.has(n.id) || (n.depth === 0 && expanded.has("*top"));
+  const isOpen = (n) => expanded.has(n.id);
 
   function matches(n) {
     if (n.label.toLowerCase().includes(q) || n.id.toLowerCase().includes(q)) return true;
@@ -135,10 +136,10 @@ export function init({ root, onError, setBadge }) {
     clear(treeEl);
     const rows = [];
     if (q.length >= 2) {
-      const hits = [...tree.byId.values()].filter((n) => visible(n) && matches(n));
+      const hits = [...tree.byId.values()].filter((n) => visible(n) && matches(n)), hitIds = new Set(hits.map((n) => n.id));
       const keep = new Set();
       for (const n of hits.slice(0, MATCH_CAP)) for (let p = n; p; p = tree.byId.get(p.parent)) keep.add(p.id);
-      const add = (n) => { rows.push(row(n, keep.has(n.id) && n.kids.some((c) => keep.has(c.id)), hits.includes(n)));
+      const add = (n) => { rows.push(row(n, keep.has(n.id) && n.kids.some((c) => keep.has(c.id)), hitIds.has(n.id)));
         for (const c of sorted(n.kids)) if (keep.has(c.id)) add(c); };
       sorted(tree.roots).filter((r) => keep.has(r.id)).forEach(add);
       treeEl.append(...rows);
@@ -164,7 +165,7 @@ export function init({ root, onError, setBadge }) {
   function sub(n) {
     if (key === "iptc") {
       const parts = [`level ${n.info.level}`];
-      if (n.kids.length) parts.push(`${n.leaves === 1 ? n.kids.length : fmt.int(n.kids.length)} below`);
+      if (n.kids.length) parts.push(`${n.kids.length} below`);
       if (!n.info.matched) parts.push(n.info.level === 0 ? "rolled up" : "not matched");
       return parts.join(" · ");
     }
@@ -178,15 +179,18 @@ export function init({ root, onError, setBadge }) {
     const r = el("div", { class: `tree-row${n.id === selected ? " sel" : ""}${hit ? " hit" : ""}${n.total ? "" : " zero"}`,
       role: "treeitem", "aria-level": String(n.depth + 1), "aria-selected": String(n.id === selected), "aria-expanded": has ? String(open) : null,
       tabindex: "-1", "data-id": n.id, style: `padding-left:${n.depth * 18 + 6}px`,
-      onclick: (e) => { if (has && (e.target.closest(".caret") || n.id === selected)) toggle(n); select(n.id); } },
+      onclick: () => { if (has && !q) flip(n); select(n.id); } },
       el("span", { class: "caret", "aria-hidden": "true" }, has ? (open ? "▾" : "▸") : ""),
       el("span", { class: "nm" }, el("span", { class: "lb" }, n.label), el("span", { class: "sb" }, sub(n))),
-      el("span", { class: "bar-cell num" }, el("span", { class: "b", style: `width:${n.total ? Math.max(2, Math.round((n.total / max) * 80)) : 0}px` }), fmt.int(n.total)));
+      el("span", { class: "tree-val", title: `${fmt.int(n.total)} ${tree.about.metric}` },
+        el("span", { class: "track" }, el("span", { class: "b", style: `width:${n.total ? Math.max(2, Math.round((n.total / max) * 100)) : 0}%` })),
+        el("span", { class: "n" }, fmt.int(n.total))));
     r.addEventListener("keydown", (e) => keys(e, n));
     return r;
   }
 
-  function toggle(n) { if (isOpen(n)) { expanded.delete(n.id); if (n.depth === 0 && expanded.has("*top")) { expanded.delete("*top"); tree.roots.forEach((r) => r !== n && expanded.add(r.id)); } } else expanded.add(n.id); paintTree(); refocus(n.id); }
+  const flip = (n) => { if (isOpen(n)) expanded.delete(n.id); else expanded.add(n.id); };
+  function toggle(n) { flip(n); paintTree(); refocus(n.id); }
   function select(id) { selected = id; paintTree(); paintDetail(); refocus(id); }
   function refocus(id) { const r = treeEl.querySelector(`[data-id="${CSS.escape(id)}"]`); if (r) { treeEl.querySelectorAll("[role=treeitem]").forEach((x) => { x.tabIndex = -1; }); r.tabIndex = 0; r.focus({ preventScroll: false }); } }
 
@@ -228,12 +232,12 @@ export function init({ root, onError, setBadge }) {
     const stats = el("div", { class: "stats" });
     if (key === "iptc") {
       stats.append(stat(fmt.int(n.total), n.kids.length ? `${metric}, incl. below` : `${metric}, best match`),
-        stat(fmt.int(n.info.top3), `in a post's top ${3}`), stat(String(n.info.level), "level"));
+        stat(fmt.int(n.info.top3), "posts with it in their top 3"), stat(String(n.info.level), "level"));
     } else if (n.kind === "entity") {
       stats.append(stat(fmt.int(n.total), metric), stat(fmt.int(n.info.sitelinks), "Wikipedia editions"), stat(fmt.int(n.info.n_aliases), "aliases"));
     } else if (n.kind === "cluster") {
       stats.append(stat(fmt.int(n.total), "posts"), stat(n.info.label_source === "llm" ? "LLM" : n.info.label_source, "named by"),
-        stat(fmt.pct(n.info.iptc_l1_share), "posts agreeing on a subject"));
+        stat(fmt.pct(n.info.iptc_l1_share), "posts on the per-post majority subject"));
     } else {
       stats.append(stat(fmt.int(n.total), metric), stat(fmt.int(n.leaves), key === "clusters" ? "clusters" : "entries"),
         stat(fmt.int(countSeen(n)), "seen in period"));
